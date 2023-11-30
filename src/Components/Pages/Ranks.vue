@@ -35,7 +35,7 @@
 
 	const chart = asyncComputed(async () => {
 		const data = pipe(
-			ranks as RanksData[],
+			ranks as unknown as RanksData[],
 			forEach(rank => {
 				const date = new Date(rank.updated_at)
 
@@ -123,7 +123,7 @@
 
 	const data = pipe(
 		pipe(
-			ranks as (RanksData & {
+			ranks as unknown as (RanksData & {
 				icon: string,
 				color: Ref<string | null>,
 				show_more: Ref<boolean>
