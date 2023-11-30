@@ -5,6 +5,9 @@ on:
     schedule:
         -   cron: "0 * * * *"
 
+env:
+    TZ: Asia/Shanghai
+
 jobs:
     update:
         runs-on: ubuntu-latest
@@ -17,15 +20,13 @@ jobs:
             -   run: pnpm install --frozen-lockfile
             -   run: pnpm run _update
 
-            -   name: Commit
-                run: |
+            -   run: |
                     git config --local user.email "github-actions@noreply.github.com"
                     git config --local user.name "github-actions"
                     git add --all
-                    git commit -m "feat(data): update" || echo "No changes"
+                    git commit -m "feat(data): update" || echo "无变化"
 
-            -   name: Push changes
-                uses: ad-m/github-push-action@master
+            -   uses: ad-m/github-push-action@master
                 with:
                     github_token: ${{ secrets.GITHUB_TOKEN }}
                     branch: ${{ github.ref }}
