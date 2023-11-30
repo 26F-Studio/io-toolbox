@@ -1,0 +1,31 @@
+name: data updater
+
+on:
+    workflow_dispatch:
+    schedule:
+        -   cron: "0 * * * *"
+
+jobs:
+    update:
+        runs-on: ubuntu-latest
+
+        steps:
+            -   uses: actions/checkout@v2
+
+            -   uses: actions/setup-node@v3
+            -   run: npm install -g pnpm
+            -   run: pnpm install --frozen-lockfile
+            -   run: pnpm run _update
+
+            -   name: Commit
+                run: |
+                    git config --local user.email "github-actions@noreply.github.com"
+                    git config --local user.name "github-actions"
+                    git add --all
+                    git commit -m "feat(data): update" || echo "No changes"
+
+            -   name: Push changes
+                uses: ad-m/github-push-action@master
+                with:
+                    github_token: ${{ secrets.GITHUB_TOKEN }}
+                    branch: ${{ github.ref }}
