@@ -3,6 +3,7 @@ import ranks from '../src/data/ranks.json'
 import { differenceInDays } from 'date-fns'
 import Tetrio, { TetraLeagueRank } from 'tetrio.js'
 import { writeFile } from 'node:fs/promises'
+import { sortBy } from 'remeda'
 
 (async () => {
 	const now = Date.now()
@@ -35,9 +36,9 @@ import { writeFile } from 'node:fs/promises'
 		const rank_players = players.filter(user => rank === user.league.rank)
 		const position = Math.floor((percent / 100) * players.length) - 1
 
-		const apm_leaderboard = rank_players.sort((prev, next) => prev.league.apm - next.league.apm)
-		const pps_leaderboard = rank_players.sort((prev, next) => prev.league.pps - next.league.pps)
-		const vs_leaderboard = rank_players.sort((prev, next) => prev.league.vs - next.league.vs)
+		const apm_leaderboard = sortBy(rank_players, player => player.league.apm)
+		const pps_leaderboard = sortBy(rank_players, player => player.league.pps)
+		const vs_leaderboard = sortBy(rank_players, player => player.league.vs)
 
 		const minimum_apm_player = apm_leaderboard.at(0)
 		const minimum_pps_player = pps_leaderboard.at(0)
