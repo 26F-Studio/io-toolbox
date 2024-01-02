@@ -93,7 +93,7 @@ import { sortBy } from 'remeda'
 	}
 
 	const final_ranks = ranks.filter(rank => {
-		return differenceInDays(new Date(rank.updated_at), now) <= 7
+		return Math.abs(differenceInDays(new Date(rank.updated_at), now)) <= 7
 	})
 
 	await writeFile('src/data/ranks.json', JSON.stringify(final_ranks), {
