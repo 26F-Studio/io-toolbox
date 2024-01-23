@@ -36,15 +36,6 @@
 	const chart = asyncComputed(async () => {
 		const data = pipe(
 			ranks as unknown as RanksData[],
-			forEach(rank => {
-				const date = new Date(rank.updated_at)
-
-				date.setMinutes(0)
-				date.setSeconds(0)
-				date.setMilliseconds(0)
-
-				rank.updated_at = date.toLocaleString()
-			}),
 			groupBy(rank => rank.updated_at)
 		)
 
@@ -88,7 +79,7 @@
 					)
 				).map(async ([rank, records]) => {
 					return {
-						type: 'line' as 'line',
+						type: 'line' as const,
 						name: rank.toUpperCase(),
 						data: records.map(rank => {
 							return rank.require_tr.toFixed(2)
@@ -107,6 +98,16 @@
 		return result
 	}, null)
 
+	function formatDate(value: string) {
+		const date = new Date(value)
+
+		date.setMinutes(0)
+		date.setSeconds(0)
+		date.setMilliseconds(0)
+
+		return date.toLocaleString()
+	}
+
 	function getIcon(rank: string) {
 		const filename = rank.toLowerCase()
 			.replace('-', 'm').replace('+', 'p')
@@ -116,7 +117,7 @@
 
 	async function getColor(rank: string) {
 		const pixels = await rgbaster(getIcon(rank))
-		const [r, g, b] = pixels[0].color.split('(')[1].split(')')[0].split(',').slice(0, 3)
+		const [r, g, b] = pixels[1].color.split('(')[1].split(')')[0].split(',').slice(0, 3)
 
 		return `rgba(${r}, ${g}, ${b}, 0.5)`
 	}
@@ -171,17 +172,49 @@
 								{{ rank.player_count }} 玩家
 							</n-text>
 
-							<n-text strong>
-								{{ rank.require_tr.toFixed(2) }} TR
-							</n-text>
+							<n-popover>
+								<template #trigger>
+									<n-text strong>
+										{{ rank.require_tr.toFixed(2) }} TR
+									</n-text>
+								</template>
+
+								{{ rank.require_tr }}
+							</n-popover>
 						</n-space>
 					</n-space>
 
 					<n-descriptions :content-style='{ textAlign: "center" }' class='cursor-pointer' label-align='center'
 									@click='rank.show_more.value = !rank.show_more.value'>
-						<n-descriptions-item label='平均 APM'>{{ rank.average_apm.toFixed(2) }}</n-descriptions-item>
-						<n-descriptions-item label='平均 PPS'>{{ rank.average_pps.toFixed(2) }}</n-descriptions-item>
-						<n-descriptions-item label='平均 VS'>{{ rank.average_vs.toFixed(2) }}</n-descriptions-item>
+						<n-descriptions-item label='平均 APM'>
+							<n-popover>
+								<template #trigger>
+									{{ rank.average_apm.toFixed(2) }}
+								</template>
+
+								{{ rank.average_apm }}
+							</n-popover>
+						</n-descriptions-item>
+
+						<n-descriptions-item label='平均 PPS'>
+							<n-popover>
+								<template #trigger>
+									{{ rank.average_pps.toFixed(2) }}
+								</template>
+
+								{{ rank.average_pps }}
+							</n-popover>
+						</n-descriptions-item>
+
+						<n-descriptions-item label='平均 VS'>
+							<n-popover>
+								<template #trigger>
+									{{ rank.average_vs.toFixed(2) }}
+								</template>
+
+								{{ rank.average_vs }}
+							</n-popover>
+						</n-descriptions-item>
 					</n-descriptions>
 
 					<n-collapse-transition v-model:show='rank.show_more.value'>
@@ -192,9 +225,8 @@
 										{{ rank.minimum_apm_player.value.toFixed(2) }}
 									</template>
 
-									<n-button :href='(`https://ch.tetr.io/u/${rank.minimum_apm_player.id}`)' tag='a'
-											  text
-											  type='primary'>
+									<n-button :href='(`https://ch.tetr.io/u/${rank.minimum_apm_player.id}`)'
+											  tag='a' text type='primary'>
 										{{ rank.minimum_apm_player.name }}
 									</n-button>
 								</n-popover>
@@ -207,8 +239,7 @@
 									</template>
 
 									<n-button :href='(`https://ch.tetr.io/u/${rank.minimum_pps_player.id}`)' tag='a'
-											  text
-											  type='primary'>
+											  text type='primary'>
 										{{ rank.minimum_pps_player.name }}
 									</n-button>
 								</n-popover>
@@ -234,8 +265,7 @@
 									</template>
 
 									<n-button :href='(`https://ch.tetr.io/u/${rank.maximum_apm_player.id}`)' tag='a'
-											  text
-											  type='primary'>
+											  text type='primary'>
 										{{ rank.maximum_apm_player.name }}
 									</n-button>
 								</n-popover>
@@ -270,19 +300,27 @@
 						</n-descriptions>
 					</n-collapse-transition>
 
-					<n-el class='text-center'>
+					<n-element class='text-center'>
 						<n-text :depth='3' class='text-lg'>
-							更新时间: {{ new Date(rank.updated_at).toLocaleString() }}
+							更新时间:
+							<n-popover>
+								<template #trigger>
+									{{ formatDate(rank.updated_at) }}
+								</template>
+
+								{{ new Date(rank.updated_at).toLocaleString() }}
+							</n-popover>
 						</n-text>
-					</n-el>
+					</n-element>
 				</n-space>
 			</n-card>
 		</n-space>
 
 		<n-scrollbar x-scrollable>
-			<n-el v-if='chart' class='w-[300vw] sm:w-screen h-[200vh] sm:h-screen flex justify-center items-center'>
+			<n-element v-if='chart'
+					   class='w-[300vw] sm:w-screen h-[200vh] sm:h-screen flex justify-center items-center'>
 				<v-chart :option='chart' class='sm:w-4/5 sm:h-4/5 p-5 rounded' />
-			</n-el>
+			</n-element>
 		</n-scrollbar>
 	</n-space>
 </template>
