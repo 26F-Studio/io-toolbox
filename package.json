@@ -5,11 +5,11 @@
         "dev": "vite",
         "build": "vue-tsc && vite build",
         "preview": "vite preview",
-        "_update": "tsx scripts/update.ts"
+        "_update_ranks": "tsx scripts/update_ranks.ts"
     },
     "devDependencies": {
         "@supabase/supabase-js": "^2.39.3",
-        "@types/node": "^20.11.5",
+        "@types/node": "^20.11.6",
         "@vicons/antd": "^0.12.0",
         "@vicons/tabler": "^0.12.0",
         "@vitejs/plugin-legacy": "^5.2.0",
@@ -17,6 +17,7 @@
         "@vueuse/core": "^10.7.2",
         "date-fns": "^3.3.1",
         "echarts": "^5.4.3",
+        "hash-wasm": "^4.11.0",
         "naive-ui": "^2.37.3",
         "pinia": "^2.1.7",
         "pinia-plugin-persistedstate": "^3.2.1",

@@ -65,18 +65,7 @@
 													enter-from-class='opacity-0'
 													leave-active-class='transition duration-300'
 													leave-to-class='opacity-0'>
-											<KeepAlive>
-												<Suspense>
-													<Component :is='Component' />
-
-													<template #fallback>
-														<n-el
-															class='w-screen h-screen flex justify-center items-center'>
-															<n-spin size='large' />
-														</n-el>
-													</template>
-												</Suspense>
-											</KeepAlive>
+											<Component :is='Component' />
 										</Transition>
 									</template>
 								</RouterView>

@@ -1,27 +1,22 @@
 <script lang='ts' setup>
-	import ranks from '@/data/ranks.json'
+	import data_ranks from '@/data/ranks.json'
 	import rgbaster from 'rgbaster-plus'
-	import { Ref } from 'vue'
-	import { flatten, forEach, groupBy, pipe, sortBy, uniqBy } from 'remeda'
+	import { flatten, groupBy, pipe, sortBy, uniqBy } from 'remeda'
 	import VChart from 'vue-echarts'
 	import { asyncComputed } from '@vueuse/core'
-	import { ComposeOption, use } from 'echarts/core'
-	import { LineChart, LineSeriesOption } from 'echarts/charts'
+	import { use } from 'echarts/core'
+	import { LineChart } from 'echarts/charts'
 	import { CanvasRenderer } from 'echarts/renderers'
 
 	import {
 		GridComponent,
-		GridComponentOption,
 		LegendComponent,
-		LegendComponentOption,
 		TitleComponent,
-		TitleComponentOption,
 		ToolboxComponent,
-		ToolboxComponentOption,
-		TooltipComponent,
-		TooltipComponentOption
+		TooltipComponent
 	} from 'echarts/components'
-	import { RanksData } from '@/types/data'
+	import { RankData } from '@/types/data/ranks'
+	import { Ref } from 'vue'
 
 	use([
 		TitleComponent,
@@ -33,20 +28,12 @@
 		CanvasRenderer
 	])
 
-	const chart = asyncComputed(async () => {
-		const data = pipe(
-			ranks as unknown as RanksData[],
-			groupBy(rank => rank.updated_at)
-		)
+	const ranks: RankData[] = data_ranks
 
-		const result: ComposeOption<
-			| TitleComponentOption
-			| TooltipComponentOption
-			| ToolboxComponentOption
-			| LegendComponentOption
-			| GridComponentOption
-			| LineSeriesOption
-		> = {
+	const chart = asyncComputed(async () => {
+		const data = groupBy(ranks, rank => formatDate(rank.updated_at))
+
+		return {
 			backgroundColor: '#FFF',
 			animationDuration: 5000,
 			title: {
@@ -77,25 +64,25 @@
 						flatten(),
 						groupBy(rank => rank.name)
 					)
-				).map(async ([rank, records]) => {
-					return {
-						type: 'line' as const,
-						name: rank.toUpperCase(),
-						data: records.map(rank => {
-							return rank.require_tr.toFixed(2)
-						}),
-						endLabel: {
-							show: true
-						},
-						lineStyle: {
-							color: await getColor(rank)
-						}
+				).map(async ([rank, records]) => ({
+					type: 'line' as const,
+					name: rank.toUpperCase(),
+					data: records.map(rank => rank.require_tr.toFixed(2)),
+					endLabel: {
+						show: true
+					},
+					lineStyle: {
+						color: await getColor(rank, false)
+					},
+					areaStyle: {
+						color: await getColor(rank, false)
+					},
+					itemStyle: {
+						color: await getColor(rank, false)
 					}
-				})
+				}))
 			)
 		}
-
-		return result
 	}, null)
 
 	function formatDate(value: string) {
@@ -110,210 +97,216 @@
 
 	function getIcon(rank: string) {
 		const filename = rank.toLowerCase()
-			.replace('-', 'm').replace('+', 'p')
+			.replace('-', 'm')
+			.replace('+', 'p')
 
-		return new URL(`../../assets/${filename}.png`, import.meta.url).href
+		return new URL(`../../assets/rank/${filename}.png`, import.meta.url).href
 	}
 
-	async function getColor(rank: string) {
+	async function getColor(rank: string, transparent = true) {
 		const pixels = await rgbaster(getIcon(rank))
 		const [r, g, b] = pixels[1].color.split('(')[1].split(')')[0].split(',').slice(0, 3)
 
-		return `rgba(${r}, ${g}, ${b}, 0.5)`
+		return transparent ? `rgba(${r}, ${g}, ${b}, 0.5)` : `rgb(${r}, ${g}, ${b})`
+	}
+
+	const showMoreReferenceCacheMap = new Map<string, Ref<boolean>>()
+
+	function getShowMoreReference(rank: string) {
+		if (!showMoreReferenceCacheMap.has(rank)) {
+			const reference = ref(false)
+			showMoreReferenceCacheMap.set(rank, reference)
+		}
+
+		return showMoreReferenceCacheMap.get(rank)!
+	}
+
+	const colorRefCacheMap = new Map<string, Ref<string | undefined>>()
+
+	function getColorRef(rank: string) {
+		if (!colorRefCacheMap.has(rank)) {
+			const reference = ref<string>()
+			getColor(rank).then(result => reference.value = result)
+			colorRefCacheMap.set(rank, reference)
+		}
+
+		return colorRefCacheMap.get(rank)!
 	}
 
 	const data = pipe(
-		pipe(
-			ranks as unknown as (RanksData & {
-				icon: string,
-				color: Ref<string | null>,
-				show_more: Ref<boolean>
-			})[],
-			sortBy(rank => rank.updated_at)
-		).reverse(),
+		sortBy(ranks, rank => rank.updated_at).reverse(),
 		uniqBy(rank => rank.name),
-		forEach(rank => {
-			rank.show_more = ref(false)
-		}),
-		forEach(rank => {
-			rank.icon = getIcon(rank.name)
-		}),
-		forEach(rank => {
-			rank.color = ref(null)
-
-			getColor(rank.name)
-				.then(result => {
-					rank.color.value = result
-				})
-		}),
-		sortBy(rank => {
-			return rank.require_tr
-		})
+		sortBy(rank => rank.require_tr)
 	).reverse()
 </script>
 
 <template>
 	<n-space vertical>
 		<n-space justify='center'>
-			<n-card v-for='rank in data' :style='{ backgroundColor: rank.color.value }'
-					class='w-100'>
-				<n-space vertical>
-					<n-space justify='space-between'>
-						<n-popover>
-							<template #trigger>
-								<n-image :src='rank.icon' :width='50' />
-							</template>
-
-							<n-text strong>{{ rank.name.toUpperCase() }}</n-text>
-						</n-popover>
-
-						<n-space :size='0' align='end' vertical>
-							<n-text strong>
-								{{ rank.player_count }} 玩家
-							</n-text>
-
+			<template v-for='rank in data'>
+				<n-card :style='{ backgroundColor: getColorRef(rank.name).value }'
+						class='w-100'>
+					<n-space vertical>
+						<n-space justify='space-between'>
 							<n-popover>
 								<template #trigger>
-									<n-text strong>
-										{{ rank.require_tr.toFixed(2) }} TR
-									</n-text>
+									<n-image :src='getIcon(rank.name)' :width='50' />
 								</template>
 
-								{{ rank.require_tr }}
+								<n-text strong>{{ rank.name.toUpperCase() }}</n-text>
 							</n-popover>
+
+							<n-space :size='0' align='end' vertical>
+								<n-text strong>
+									{{ rank.player_count }} 玩家
+								</n-text>
+
+								<n-popover>
+									<template #trigger>
+										<n-text strong>
+											{{ rank.require_tr.toFixed(2) }} TR
+										</n-text>
+									</template>
+
+									{{ rank.require_tr }}
+								</n-popover>
+							</n-space>
 						</n-space>
-					</n-space>
 
-					<n-descriptions :content-style='{ textAlign: "center" }' class='cursor-pointer' label-align='center'
-									@click='rank.show_more.value = !rank.show_more.value'>
-						<n-descriptions-item label='平均 APM'>
-							<n-popover>
-								<template #trigger>
-									{{ rank.average_apm.toFixed(2) }}
-								</template>
-
-								{{ rank.average_apm }}
-							</n-popover>
-						</n-descriptions-item>
-
-						<n-descriptions-item label='平均 PPS'>
-							<n-popover>
-								<template #trigger>
-									{{ rank.average_pps.toFixed(2) }}
-								</template>
-
-								{{ rank.average_pps }}
-							</n-popover>
-						</n-descriptions-item>
-
-						<n-descriptions-item label='平均 VS'>
-							<n-popover>
-								<template #trigger>
-									{{ rank.average_vs.toFixed(2) }}
-								</template>
-
-								{{ rank.average_vs }}
-							</n-popover>
-						</n-descriptions-item>
-					</n-descriptions>
-
-					<n-collapse-transition v-model:show='rank.show_more.value'>
-						<n-descriptions :content-style='{ textAlign: "center" }' label-align='center'>
-							<n-descriptions-item label='最小 APM'>
-								<n-popover animated>
+						<n-descriptions :content-style='{ textAlign: "center" }' class='cursor-pointer'
+										label-align='center'
+										@click='getShowMoreReference(rank.name).value = !getShowMoreReference(rank.name).value'>
+							<n-descriptions-item label='平均 APM'>
+								<n-popover>
 									<template #trigger>
-										{{ rank.minimum_apm_player.value.toFixed(2) }}
+										{{ rank.average_apm.toFixed(2) }}
 									</template>
 
-									<n-button :href='(`https://ch.tetr.io/u/${rank.minimum_apm_player.id}`)'
-											  tag='a' text type='primary'>
-										{{ rank.minimum_apm_player.name }}
-									</n-button>
+									{{ rank.average_apm }}
 								</n-popover>
 							</n-descriptions-item>
 
-							<n-descriptions-item label='最小 PPS'>
-								<n-popover animated>
+							<n-descriptions-item label='平均 PPS'>
+								<n-popover>
 									<template #trigger>
-										{{ rank.minimum_pps_player.value.toFixed(2) }}
+										{{ rank.average_pps.toFixed(2) }}
 									</template>
 
-									<n-button :href='(`https://ch.tetr.io/u/${rank.minimum_pps_player.id}`)' tag='a'
-											  text type='primary'>
-										{{ rank.minimum_pps_player.name }}
-									</n-button>
+									{{ rank.average_pps }}
 								</n-popover>
 							</n-descriptions-item>
 
-							<n-descriptions-item label='最小 VS'>
-								<n-popover animated>
+							<n-descriptions-item label='平均 VS'>
+								<n-popover>
 									<template #trigger>
-										{{ rank.minimum_vs_player.value.toFixed(2) }}
+										{{ rank.average_vs.toFixed(2) }}
 									</template>
 
-									<n-button :href='(`https://ch.tetr.io/u/${rank.minimum_vs_player.id}`)' tag='a' text
-											  type='primary'>
-										{{ rank.minimum_vs_player.name }}
-									</n-button>
-								</n-popover>
-							</n-descriptions-item>
-
-							<n-descriptions-item label='最大 APM'>
-								<n-popover animated>
-									<template #trigger>
-										{{ rank.maximum_apm_player.value.toFixed(2) }}
-									</template>
-
-									<n-button :href='(`https://ch.tetr.io/u/${rank.maximum_apm_player.id}`)' tag='a'
-											  text type='primary'>
-										{{ rank.maximum_apm_player.name }}
-									</n-button>
-								</n-popover>
-							</n-descriptions-item>
-
-							<n-descriptions-item label='最大 PPS'>
-								<n-popover animated>
-									<template #trigger>
-										{{ rank.maximum_pps_player.value.toFixed(2) }}
-									</template>
-
-									<n-button :href='(`https://ch.tetr.io/u/${rank.maximum_pps_player.id}`)' tag='a'
-											  text
-											  type='primary'>
-										{{ rank.maximum_pps_player.name }}
-									</n-button>
-								</n-popover>
-							</n-descriptions-item>
-
-							<n-descriptions-item label='最大 VS'>
-								<n-popover animated>
-									<template #trigger>
-										{{ rank.maximum_vs_player.value.toFixed(2) }}
-									</template>
-
-									<n-button :href='(`https://ch.tetr.io/u/${rank.maximum_vs_player.id}`)' tag='a' text
-											  type='primary'>
-										{{ rank.maximum_vs_player.name }}
-									</n-button>
+									{{ rank.average_vs }}
 								</n-popover>
 							</n-descriptions-item>
 						</n-descriptions>
-					</n-collapse-transition>
 
-					<n-element class='text-center'>
-						<n-text :depth='3' class='text-lg'>
-							更新时间:
-							<n-popover>
-								<template #trigger>
-									{{ formatDate(rank.updated_at) }}
-								</template>
+						<n-collapse-transition v-model:show='getShowMoreReference(rank.name).value'>
+							<n-descriptions :content-style='{ textAlign: "center" }' label-align='center'>
+								<n-descriptions-item label='最小 APM'>
+									<n-popover animated>
+										<template #trigger>
+											{{ rank.minimum_apm_player.value.toFixed(2) }}
+										</template>
 
-								{{ new Date(rank.updated_at).toLocaleString() }}
-							</n-popover>
-						</n-text>
-					</n-element>
-				</n-space>
-			</n-card>
+										<n-button :href='(`https://ch.tetr.io/u/${rank.minimum_apm_player.id}`)'
+												  tag='a' text type='primary'>
+											{{ rank.minimum_apm_player.name }}
+										</n-button>
+									</n-popover>
+								</n-descriptions-item>
+
+								<n-descriptions-item label='最小 PPS'>
+									<n-popover animated>
+										<template #trigger>
+											{{ rank.minimum_pps_player.value.toFixed(2) }}
+										</template>
+
+										<n-button :href='(`https://ch.tetr.io/u/${rank.minimum_pps_player.id}`)' tag='a'
+												  text type='primary'>
+											{{ rank.minimum_pps_player.name }}
+										</n-button>
+									</n-popover>
+								</n-descriptions-item>
+
+								<n-descriptions-item label='最小 VS'>
+									<n-popover animated>
+										<template #trigger>
+											{{ rank.minimum_vs_player.value.toFixed(2) }}
+										</template>
+
+										<n-button :href='(`https://ch.tetr.io/u/${rank.minimum_vs_player.id}`)' tag='a'
+												  text
+												  type='primary'>
+											{{ rank.minimum_vs_player.name }}
+										</n-button>
+									</n-popover>
+								</n-descriptions-item>
+
+								<n-descriptions-item label='最大 APM'>
+									<n-popover animated>
+										<template #trigger>
+											{{ rank.maximum_apm_player.value.toFixed(2) }}
+										</template>
+
+										<n-button :href='(`https://ch.tetr.io/u/${rank.maximum_apm_player.id}`)' tag='a'
+												  text type='primary'>
+											{{ rank.maximum_apm_player.name }}
+										</n-button>
+									</n-popover>
+								</n-descriptions-item>
+
+								<n-descriptions-item label='最大 PPS'>
+									<n-popover animated>
+										<template #trigger>
+											{{ rank.maximum_pps_player.value.toFixed(2) }}
+										</template>
+
+										<n-button :href='(`https://ch.tetr.io/u/${rank.maximum_pps_player.id}`)' tag='a'
+												  text
+												  type='primary'>
+											{{ rank.maximum_pps_player.name }}
+										</n-button>
+									</n-popover>
+								</n-descriptions-item>
+
+								<n-descriptions-item label='最大 VS'>
+									<n-popover animated>
+										<template #trigger>
+											{{ rank.maximum_vs_player.value.toFixed(2) }}
+										</template>
+
+										<n-button :href='(`https://ch.tetr.io/u/${rank.maximum_vs_player.id}`)' tag='a'
+												  text
+												  type='primary'>
+											{{ rank.maximum_vs_player.name }}
+										</n-button>
+									</n-popover>
+								</n-descriptions-item>
+							</n-descriptions>
+						</n-collapse-transition>
+
+						<n-element class='text-center'>
+							<n-text :depth='3' class='text-lg'>
+								更新时间:
+								<n-popover>
+									<template #trigger>
+										{{ formatDate(rank.updated_at) }}
+									</template>
+
+									{{ new Date(rank.updated_at).toLocaleString() }}
+								</n-popover>
+							</n-text>
+						</n-element>
+					</n-space>
+				</n-card>
+			</template>
 		</n-space>
 
 		<n-scrollbar x-scrollable>
