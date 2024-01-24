@@ -9,7 +9,7 @@ import { resolve as resolvePath } from 'node:path'
 
 // https://vitejs.dev/config
 export default defineConfig({
-	base: '/statistic',
+	base: '/io-toolbox',
 	resolve: {
 		alias: {
 			'@': resolvePath(__dirname, 'src')
